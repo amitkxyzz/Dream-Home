@@ -1,9 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic Project Expenses Tracker</title>
+    <title>Project Expenses Tracker</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -11,6 +15,7 @@
             padding: 20px;
             background-color: #f5f5f5;
         }
+
         .container {
             max-width: 1000px;
             margin: 0 auto;
@@ -19,16 +24,19 @@
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
+
         h1 {
             text-align: center;
             color: #2c3e50;
             margin-bottom: 20px;
         }
+
         table {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 20px;
         }
+
         th {
             background-color: #3498db;
             color: white;
@@ -37,21 +45,26 @@
             border: 1px solid #ddd;
             font-weight: bold;
         }
+
         td {
             padding: 10px;
             border: 1px solid #ddd;
             text-align: center;
         }
+
         tr:nth-child(even) {
             background-color: #f9f9f9;
         }
+
         tr:hover {
             background-color: #f1f1f1;
         }
+
         .total-row {
             background-color: #e8f4fc;
             font-weight: bold;
         }
+
         .btn {
             background-color: #3498db;
             color: white;
@@ -62,32 +75,40 @@
             font-size: 14px;
             margin-right: 5px;
         }
+
         .btn:hover {
             background-color: #2980b9;
         }
+
         .btn-danger {
             background-color: #e74c3c;
         }
+
         .btn-danger:hover {
             background-color: #c0392b;
         }
+
         .btn-success {
             background-color: #2ecc71;
         }
+
         .btn-success:hover {
             background-color: #27ae60;
         }
+
         .footer {
             margin-top: 20px;
             text-align: center;
             color: #7f8c8d;
             font-size: 14px;
         }
+
         .actions {
             margin-bottom: 20px;
             display: flex;
             justify-content: space-between;
         }
+
         form {
             margin-bottom: 20px;
             background-color: #f9f9f9;
@@ -95,53 +116,85 @@
             border-radius: 5px;
             border: 1px solid #ddd;
         }
+
         .form-row {
             display: flex;
             flex-wrap: wrap;
             margin-bottom: 10px;
         }
+
         .form-group {
             flex: 1;
             min-width: 150px;
             margin-right: 10px;
             margin-bottom: 10px;
         }
+
         .form-group label {
             display: block;
             margin-bottom: 5px;
             font-weight: bold;
             color: #333;
         }
-        .form-group input, .form-group textarea {
+
+        .form-group input,
+        .form-group textarea {
             width: 100%;
             padding: 8px;
             border: 1px solid #ddd;
             border-radius: 4px;
             box-sizing: border-box;
         }
+
         .action-cell {
             display: flex;
             justify-content: center;
             gap: 5px;
         }
+
         .hidden {
             display: none;
         }
+
         #searchInput {
             padding: 8px;
             border: 1px solid #ddd;
             border-radius: 4px;
             width: 250px;
         }
+
+        #loading {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .notification {
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            color: white;
+            display: none;
+        }
+
+        .notification.success {
+            background-color: #2ecc71;
+        }
+
+        .notification.error {
+            background-color: #e74c3c;
+        }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1>Project Expenses Tracker</h1>
-        
+
+        <div id="notification" class="notification"></div>
+
         <!-- Form for adding/editing expenses -->
         <form id="expenseForm">
-            <input type="hidden" id="editIndex" value="-1">
+            <input type="hidden" id="editId" value="">
             <div class="form-row">
                 <div class="form-group">
                     <label for="product">Product</label>
@@ -173,7 +226,7 @@
             <button type="submit" class="btn btn-success" id="saveBtn">Add Expense</button>
             <button type="button" class="btn" id="cancelBtn" style="display:none;">Cancel</button>
         </form>
-        
+
         <div class="actions">
             <div>
                 <button class="btn" id="downloadExcel">Download as Excel</button>
@@ -184,8 +237,10 @@
                 <input type="text" id="searchInput" placeholder="Search by product, name...">
             </div>
         </div>
-        
-        <table id="expensesTable">
+
+        <div id="loading">Loading expenses...</div>
+
+        <table id="expensesTable" style="display: none;">
             <thead>
                 <tr>
                     <th>S.No</th>
@@ -210,57 +265,54 @@
                 </tr>
             </tfoot>
         </table>
-        
+
         <div class="footer">
             <span id="lastUpdated">Last Updated: </span>
         </div>
     </div>
 
     <script>
-        // Initial data
-        let expenses = [
-            {
-                product: "MAP",
-                description: "Initial ground level map",
-                date: "2024-10-05",
-                rate: "₹5000",
-                spend: 5000,
-                name: "Neeraj"
-            },
-            {
-                product: "MAP-CIVIL",
-                description: "Exterial and beam design",
-                date: "2025-03-03",
-                rate: "₹6/sqft",
-                spend: 5000,
-                name: "Neeraj"
-            },
-            {
-                product: "Thakedar",
-                description: "",
-                date: "2025-03-06",
-                rate: "₹180/sqft",
-                spend: 100,
-                name: "Tuntun"
-            }
-        ];
-        
-        // Load data from localStorage if available
-        function loadData() {
-            const savedExpenses = localStorage.getItem('projectExpenses');
-            if (savedExpenses) {
-                expenses = JSON.parse(savedExpenses);
-            }
-            renderTable();
-            updateLastUpdated();
+        // Firebase configuration - REPLACE WITH YOUR OWN CONFIG
+        // const firebaseConfig = {
+        //     apiKey: "YOUR_API_KEY",
+        //     authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+        //     projectId: "YOUR_PROJECT_ID",
+        //     storageBucket: "YOUR_PROJECT_ID.appspot.com",
+        //     messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+        //     appId: "YOUR_APP_ID"
+        // };
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDZKjmib6_4O8lcIt4YX-5pkewrvCsVZro",
+            authDomain: "dream-home-5f966.firebaseapp.com",
+            projectId: "dream-home-5f966",
+            storageBucket: "dream-home-5f966.firebasestorage.app",
+            messagingSenderId: "884300567643",
+            appId: "1:884300567643:web:8996af2bd116d1e23e1b7e",
+            measurementId: "G-56V6KWH96D"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const expensesCollection = db.collection('expenses');
+
+        // Global expenses array
+        let expenses = [];
+
+        // Show notification
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.style.display = 'block';
+
+            // Hide notification after 3 seconds
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 3000);
         }
-        
-        // Save data to localStorage
-        function saveData() {
-            localStorage.setItem('projectExpenses', JSON.stringify(expenses));
-            updateLastUpdated();
-        }
-        
+
         // Format date from YYYY-MM-DD to DD-MM-YYYY
         function formatDate(dateString) {
             if (!dateString) return "";
@@ -268,22 +320,112 @@
             if (dateParts.length !== 3) return dateString;
             return `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
         }
-        
+
+        // Format date for input field (YYYY-MM-DD)
+        function formatDateForInput(dateStr) {
+            if (!dateStr) return "";
+            // Check if it's already in YYYY-MM-DD format
+            if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) return dateStr;
+
+            // Convert from DD-MM-YYYY to YYYY-MM-DD
+            const parts = dateStr.split('-');
+            if (parts.length !== 3) return dateStr;
+            return `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+
         // Format number as currency
         function formatCurrency(amount) {
-            return "₹" + amount.toLocaleString('en-IN');
+            return "₹" + parseFloat(amount).toLocaleString('en-IN');
         }
-        
+
+        // Load expenses from Firestore
+        async function loadExpenses() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('expensesTable').style.display = 'none';
+
+            try {
+                const snapshot = await expensesCollection.orderBy('date', 'desc').get();
+                expenses = [];
+
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    expenses.push({
+                        id: doc.id,
+                        ...data,
+                        spend: parseFloat(data.spend)
+                    });
+                });
+
+                // If no expenses, add initial data
+                if (expenses.length === 0) {
+                    await addInitialData();
+                    return loadExpenses();
+                }
+
+                renderTable();
+                updateLastUpdated();
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('expensesTable').style.display = 'table';
+            } catch (error) {
+                console.error("Error loading expenses:", error);
+                showNotification("Error loading expenses: " + error.message, 'error');
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        // Add initial sample data
+        async function addInitialData() {
+            const initialData = [
+                {
+                    product: "MAP",
+                    description: "Initial ground level map",
+                    date: "2024-10-05",
+                    rate: "₹5000",
+                    spend: 5000,
+                    name: "Neeraj",
+                    timestamp: firebase.firestore.Timestamp.now()
+                },
+                {
+                    product: "MAP-CIVIL",
+                    description: "Exterial and beam design",
+                    date: "2025-03-03",
+                    rate: "₹6/sqft",
+                    spend: 5000,
+                    name: "Neeraj",
+                    timestamp: firebase.firestore.Timestamp.now()
+                },
+                {
+                    product: "Thakedar",
+                    description: "",
+                    date: "2025-03-06",
+                    rate: "₹180/sqft",
+                    spend: 100,
+                    name: "Tuntun",
+                    timestamp: firebase.firestore.Timestamp.now()
+                }
+            ];
+
+            try {
+                for (const expense of initialData) {
+                    await expensesCollection.add(expense);
+                }
+            } catch (error) {
+                console.error("Error adding initial data:", error);
+                showNotification("Error adding initial data: " + error.message, 'error');
+            }
+        }
+
         // Render expenses table
         function renderTable(filteredExpenses = null) {
             const tableBody = document.getElementById('expensesBody');
             tableBody.innerHTML = '';
-            
+
             const dataToRender = filteredExpenses || expenses;
-            
+
             dataToRender.forEach((expense, index) => {
                 const row = document.createElement('tr');
-                
+
                 row.innerHTML = `
                     <td>${index + 1}</td>
                     <td>${expense.product}</td>
@@ -293,149 +435,162 @@
                     <td>${formatCurrency(expense.spend)}</td>
                     <td>${expense.name}</td>
                     <td class="action-cell">
-                        <button class="btn" onclick="editExpense(${index})">Edit</button>
-                        <button class="btn btn-danger" onclick="deleteExpense(${index})">Delete</button>
+                        <button class="btn" onclick="editExpense('${expense.id}')">Edit</button>
+                        <button class="btn btn-danger" onclick="deleteExpense('${expense.id}')">Delete</button>
                     </td>
                 `;
-                
+
                 tableBody.appendChild(row);
             });
-            
+
             updateTotal();
         }
-        
+
         // Update the total spent
         function updateTotal() {
             const total = expenses.reduce((sum, expense) => sum + expense.spend, 0);
             document.getElementById('totalSpend').innerHTML = `<strong>${formatCurrency(total)}</strong>`;
         }
-        
+
         // Update the last updated timestamp
         function updateLastUpdated() {
             const now = new Date();
             const formattedDate = now.toLocaleString();
             document.getElementById('lastUpdated').textContent = `Last Updated: ${formattedDate}`;
         }
-        
-        // Add new expense
-        function addExpense(e) {
+
+        // Add or update expense
+        async function saveExpense(e) {
             e.preventDefault();
-            
-            const editIndex = parseInt(document.getElementById('editIndex').value);
-            
+
+            const editId = document.getElementById('editId').value;
+
             const expense = {
                 product: document.getElementById('product').value,
                 description: document.getElementById('description').value,
                 date: document.getElementById('date').value,
                 rate: document.getElementById('rate').value,
                 spend: parseFloat(document.getElementById('spend').value),
-                name: document.getElementById('name').value
+                name: document.getElementById('name').value,
+                timestamp: firebase.firestore.Timestamp.now()
             };
-            
-            if (editIndex >= 0) {
-                // Edit existing expense
-                expenses[editIndex] = expense;
+
+            try {
+                if (editId) {
+                    // Update existing expense
+                    await expensesCollection.doc(editId).update(expense);
+                    showNotification("Expense updated successfully!");
+                } else {
+                    // Add new expense
+                    await expensesCollection.add(expense);
+                    showNotification("Expense added successfully!");
+                }
+
+                // Reset form
+                document.getElementById('expenseForm').reset();
+                document.getElementById('editId').value = '';
                 document.getElementById('saveBtn').textContent = 'Add Expense';
                 document.getElementById('cancelBtn').style.display = 'none';
-            } else {
-                // Add new expense
-                expenses.push(expense);
+
+                // Reload data
+                loadExpenses();
+            } catch (error) {
+                console.error("Error saving expense:", error);
+                showNotification("Error saving expense: " + error.message, 'error');
             }
-            
-            // Reset form
-            document.getElementById('expenseForm').reset();
-            document.getElementById('editIndex').value = -1;
-            
-            // Update table and save data
-            renderTable();
-            saveData();
         }
-        
+
         // Edit expense
-        function editExpense(index) {
-            const expense = expenses[index];
-            
+        function editExpense(id) {
+            const expense = expenses.find(e => e.id === id);
+            if (!expense) return;
+
             document.getElementById('product').value = expense.product;
             document.getElementById('description').value = expense.description || '';
-            document.getElementById('date').value = expense.date;
+            document.getElementById('date').value = formatDateForInput(expense.date);
             document.getElementById('rate').value = expense.rate;
             document.getElementById('spend').value = expense.spend;
             document.getElementById('name').value = expense.name;
-            document.getElementById('editIndex').value = index;
-            
+            document.getElementById('editId').value = id;
+
             document.getElementById('saveBtn').textContent = 'Update Expense';
             document.getElementById('cancelBtn').style.display = 'inline-block';
-            
+
             // Scroll to form
             document.getElementById('expenseForm').scrollIntoView({ behavior: 'smooth' });
         }
-        
+
         // Delete expense
-        function deleteExpense(index) {
+        async function deleteExpense(id) {
             if (confirm('Are you sure you want to delete this expense?')) {
-                expenses.splice(index, 1);
-                renderTable();
-                saveData();
+                try {
+                    await expensesCollection.doc(id).delete();
+                    showNotification("Expense deleted successfully!");
+                    loadExpenses();
+                } catch (error) {
+                    console.error("Error deleting expense:", error);
+                    showNotification("Error deleting expense: " + error.message, 'error');
+                }
             }
         }
-        
+
         // Cancel edit
         function cancelEdit() {
             document.getElementById('expenseForm').reset();
-            document.getElementById('editIndex').value = -1;
+            document.getElementById('editId').value = '';
             document.getElementById('saveBtn').textContent = 'Add Expense';
             document.getElementById('cancelBtn').style.display = 'none';
         }
-        
+
         // Search functionality
         function searchExpenses() {
             const query = document.getElementById('searchInput').value.toLowerCase();
-            
+
             if (query.trim() === '') {
                 renderTable();
                 return;
             }
-            
-            const filteredExpenses = expenses.filter(expense => 
+
+            const filteredExpenses = expenses.filter(expense =>
                 expense.product.toLowerCase().includes(query) ||
-                expense.description.toLowerCase().includes(query) ||
+                (expense.description && expense.description.toLowerCase().includes(query)) ||
                 expense.name.toLowerCase().includes(query) ||
                 expense.rate.toLowerCase().includes(query)
             );
-            
+
             renderTable(filteredExpenses);
         }
-        
+
         // Function to download table as CSV
         function downloadCSV() {
             let csv = [
                 ['S.No', 'Product', 'Product Description', 'Date', 'Rate', 'Spend in Rupees', 'Name']
             ];
-            
+
             // Add data rows
             expenses.forEach((expense, index) => {
                 csv.push([
                     index + 1,
                     expense.product,
-                    expense.description,
+                    expense.description || '',
                     formatDate(expense.date),
                     expense.rate,
                     expense.spend,
                     expense.name
                 ]);
             });
-            
+
             // Add total row
             const total = expenses.reduce((sum, expense) => sum + expense.spend, 0);
             csv.push(['', '', '', '', 'Total:', total, '']);
-            
+
             // Convert to CSV string
-            const csvContent = csv.map(row => 
-                row.map(cell => 
+            const csvContent = csv.map(row =>
+                row.map(cell =>
                     `"${(cell || '').toString().replace(/"/g, '""')}"`
                 ).join(',')
             ).join('\n');
-            
+
             // Create download link
             const encodedUri = encodeURI('data:text/csv;charset=utf-8,' + csvContent);
             const link = document.createElement('a');
@@ -445,18 +600,18 @@
             link.click();
             document.body.removeChild(link);
         }
-        
+
         // Function to download table as Excel
         function downloadExcel() {
             let html = '<table border="1">';
-            
+
             // Header row
             html += '<tr>';
             ['S.No', 'Product', 'Product Description', 'Date', 'Rate', 'Spend in Rupees', 'Name'].forEach(header => {
                 html += `<th>${header}</th>`;
             });
             html += '</tr>';
-            
+
             // Data rows
             expenses.forEach((expense, index) => {
                 html += '<tr>';
@@ -469,7 +624,7 @@
                 html += `<td>${expense.name}</td>`;
                 html += '</tr>';
             });
-            
+
             // Total row
             const total = expenses.reduce((sum, expense) => sum + expense.spend, 0);
             html += '<tr>';
@@ -477,13 +632,13 @@
             html += `<td><strong>${total}</strong></td>`;
             html += '<td></td>';
             html += '</tr>';
-            
+
             html += '</table>';
-            
+
             // Create a blob
-            const blob = new Blob([html], {type: 'application/vnd.ms-excel'});
+            const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
             const url = window.URL.createObjectURL(blob);
-            
+
             // Create download link
             const link = document.createElement('a');
             link.href = url;
@@ -493,39 +648,40 @@
             document.body.removeChild(link);
             window.URL.revokeObjectURL(url);
         }
-        
+
         // Function to print table
         function printTable() {
             window.print();
         }
-        
+
+        // Make functions available globally (for HTML onclick)
+        window.editExpense = editExpense;
+        window.deleteExpense = deleteExpense;
+
         // Add event listeners
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             // Load data
-            loadData();
-            
+            loadExpenses();
+
             // Form submission
-            document.getElementById('expenseForm').addEventListener('submit', addExpense);
-            
+            document.getElementById('expenseForm').addEventListener('submit', saveExpense);
+
             // Cancel button
             document.getElementById('cancelBtn').addEventListener('click', cancelEdit);
-            
+
             // Download buttons
             document.getElementById('downloadCSV').addEventListener('click', downloadCSV);
             document.getElementById('downloadExcel').addEventListener('click', downloadExcel);
             document.getElementById('printTable').addEventListener('click', printTable);
-            
+
             // Search input
             document.getElementById('searchInput').addEventListener('input', searchExpenses);
-            
+
             // Set today's date as default in the date field
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('date').value = today;
-            
-            // Make edit and delete functions global for the onclick attributes
-            window.editExpense = editExpense;
-            window.deleteExpense = deleteExpense;
         });
     </script>
 </body>
+
 </html>
