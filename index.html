@@ -29,6 +29,7 @@
             text-align: center;
             color: #2c3e50;
             margin-bottom: 20px;
+            font-size: 24px;
         }
 
         table {
@@ -41,13 +42,13 @@
             background-color: #3498db;
             color: white;
             text-align: center;
-            padding: 12px;
+            padding: 12px 8px;
             border: 1px solid #ddd;
             font-weight: bold;
         }
 
         td {
-            padding: 10px;
+            padding: 10px 8px;
             border: 1px solid #ddd;
             text-align: center;
         }
@@ -74,6 +75,7 @@
             cursor: pointer;
             font-size: 14px;
             margin-right: 5px;
+            margin-bottom: 5px;
         }
 
         .btn:hover {
@@ -106,6 +108,7 @@
         .actions {
             margin-bottom: 20px;
             display: flex;
+            flex-wrap: wrap;
             justify-content: space-between;
         }
 
@@ -148,6 +151,7 @@
 
         .action-cell {
             display: flex;
+            flex-wrap: wrap;
             justify-content: center;
             gap: 5px;
         }
@@ -161,6 +165,8 @@
             border: 1px solid #ddd;
             border-radius: 4px;
             width: 250px;
+            max-width: 100%;
+            margin-bottom: 10px;
         }
 
         #loading {
@@ -182,6 +188,117 @@
 
         .notification.error {
             background-color: #e74c3c;
+        }
+
+        /* Mobile Responsive Styles */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                padding: 15px;
+            }
+
+            h1 {
+                font-size: 20px;
+            }
+
+            .actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .actions > div {
+                margin-bottom: 10px;
+                display: flex;
+                flex-wrap: wrap;
+            }
+
+            #searchInput {
+                width: 100%;
+            }
+
+            .btn {
+                font-size: 13px;
+                padding: 7px 10px;
+                margin-bottom: 5px;
+            }
+
+            /* Card-based layout for mobile */
+            table, thead, tbody, th, td, tr {
+                display: block;
+            }
+
+            /* Hide table headers */
+            thead tr {
+                position: absolute;
+                top: -9999px;
+                left: -9999px;
+            }
+
+            tr {
+                border: 1px solid #ccc;
+                margin-bottom: 10px;
+                border-radius: 5px;
+                overflow: hidden;
+            }
+
+            td {
+                border: none;
+                border-bottom: 1px solid #eee;
+                position: relative;
+                padding-left: 50%;
+                text-align: right;
+            }
+
+            td:before {
+                position: absolute;
+                top: 10px;
+                left: 10px;
+                width: 45%;
+                white-space: nowrap;
+                text-align: left;
+                font-weight: bold;
+                content: attr(data-label);
+            }
+
+            .total-row td {
+                text-align: right;
+                padding-left: 10px;
+            }
+
+            /* Exception for total row */
+            .total-row td:before {
+                content: none;
+            }
+
+            /* Show the table normally at larger screens */
+            @media (min-width: 769px) {
+                table, thead, tbody, th, td, tr {
+                    display: revert;
+                }
+
+                thead tr {
+                    position: revert;
+                }
+
+                tr {
+                    border: revert;
+                    margin-bottom: revert;
+                }
+
+                td {
+                    border: 1px solid #ddd;
+                    position: revert;
+                    padding-left: revert;
+                    text-align: center;
+                }
+
+                td:before {
+                    content: none;
+                }
+            }
         }
     </style>
 </head>
@@ -272,16 +389,7 @@
     </div>
 
     <script>
-        // Firebase configuration - REPLACE WITH YOUR OWN CONFIG
-        // const firebaseConfig = {
-        //     apiKey: "YOUR_API_KEY",
-        //     authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-        //     projectId: "YOUR_PROJECT_ID",
-        //     storageBucket: "YOUR_PROJECT_ID.appspot.com",
-        //     messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-        //     appId: "YOUR_APP_ID"
-        // };
-
+        // Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyDZKjmib6_4O8lcIt4YX-5pkewrvCsVZro",
             authDomain: "dream-home-5f966.firebaseapp.com",
@@ -333,6 +441,17 @@
             return `${parts[2]}-${parts[1]}-${parts[0]}`;
         }
 
+        // Parse date for sorting (YYYY-MM-DD to Date object)
+        function parseDate(dateStr) {
+            if (!dateStr) return new Date(0); // Default to epoch
+            const parts = dateStr.split('-');
+            if (parts.length === 3) {
+                // Format is YYYY-MM-DD
+                return new Date(parts[0], parts[1] - 1, parts[2]);
+            }
+            return new Date(0);
+        }
+
         // Format number as currency
         function formatCurrency(amount) {
             return "₹" + parseFloat(amount).toLocaleString('en-IN');
@@ -361,6 +480,9 @@
                     await addInitialData();
                     return loadExpenses();
                 }
+
+                // Sort expenses by date (newest first)
+                expenses.sort((a, b) => parseDate(b.date) - parseDate(a.date));
 
                 renderTable();
                 updateLastUpdated();
@@ -422,25 +544,34 @@
             tableBody.innerHTML = '';
 
             const dataToRender = filteredExpenses || expenses;
+            
+            // Sort expenses by date (newest first)
+            const sortedExpenses = [...dataToRender].sort((a, b) => parseDate(b.date) - parseDate(a.date));
 
-            dataToRender.forEach((expense, index) => {
+            // Starting S.No
+            let serialNumber = 1;
+
+            sortedExpenses.forEach((expense) => {
                 const row = document.createElement('tr');
 
-                row.innerHTML = `
-                    <td>${index + 1}</td>
-                    <td>${expense.product}</td>
-                    <td>${expense.description || '-'}</td>
-                    <td>${formatDate(expense.date)}</td>
-                    <td>${expense.rate}</td>
-                    <td>${formatCurrency(expense.spend)}</td>
-                    <td>${expense.name}</td>
-                    <td class="action-cell">
+                // Add data-label attributes for mobile view
+                const cells = `
+                    <td data-label="S.No">${serialNumber}</td>
+                    <td data-label="Product">${expense.product}</td>
+                    <td data-label="Description">${expense.description || '-'}</td>
+                    <td data-label="Date">${formatDate(expense.date)}</td>
+                    <td data-label="Rate">${expense.rate}</td>
+                    <td data-label="Spend">${formatCurrency(expense.spend)}</td>
+                    <td data-label="Name">${expense.name}</td>
+                    <td class="action-cell" data-label="Actions">
                         <button class="btn" onclick="editExpense('${expense.id}')">Edit</button>
                         <button class="btn btn-danger" onclick="deleteExpense('${expense.id}')">Delete</button>
                     </td>
                 `;
 
+                row.innerHTML = cells;
                 tableBody.appendChild(row);
+                serialNumber++;
             });
 
             updateTotal();
@@ -563,12 +694,15 @@
 
         // Function to download table as CSV
         function downloadCSV() {
+            // Sort expenses by date (newest first)
+            const sortedExpenses = [...expenses].sort((a, b) => parseDate(b.date) - parseDate(a.date));
+            
             let csv = [
                 ['S.No', 'Product', 'Product Description', 'Date', 'Rate', 'Spend in Rupees', 'Name']
             ];
 
             // Add data rows
-            expenses.forEach((expense, index) => {
+            sortedExpenses.forEach((expense, index) => {
                 csv.push([
                     index + 1,
                     expense.product,
@@ -603,6 +737,9 @@
 
         // Function to download table as Excel
         function downloadExcel() {
+            // Sort expenses by date (newest first)
+            const sortedExpenses = [...expenses].sort((a, b) => parseDate(b.date) - parseDate(a.date));
+            
             let html = '<table border="1">';
 
             // Header row
@@ -613,7 +750,7 @@
             html += '</tr>';
 
             // Data rows
-            expenses.forEach((expense, index) => {
+            sortedExpenses.forEach((expense, index) => {
                 html += '<tr>';
                 html += `<td>${index + 1}</td>`;
                 html += `<td>${expense.product}</td>`;
