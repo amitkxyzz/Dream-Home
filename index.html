@@ -8,6 +8,7 @@
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -190,6 +191,70 @@
             background-color: #e74c3c;
         }
 
+        /* Photo upload and preview styles */
+        .photo-container {
+            margin-top: 15px;
+        }
+
+        .preview-container {
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        #photoPreview {
+            max-width: 100%;
+            max-height: 200px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .thumbnail {
+            max-width: 80px;
+            max-height: 80px;
+            cursor: pointer;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+        }
+
+        .modal-content {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+        }
+
+        .modal-img {
+            max-width: 90%;
+            max-height: 90%;
+        }
+
+        .close {
+            position: absolute;
+            top: 15px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            transition: 0.3s;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #bbb;
+        }
+
         /* Mobile Responsive Styles */
         @media (max-width: 768px) {
             body {
@@ -322,8 +387,8 @@
                     <input type="text" id="description">
                 </div>
                 <div class="form-group">
-                    <label for="date">Date</label>
-                    <input type="date" id="date" required>
+                    <label for="datetime">Date & Time</label>
+                    <input type="datetime-local" id="datetime" required>
                 </div>
             </div>
             <div class="form-row">
@@ -338,6 +403,15 @@
                 <div class="form-group">
                     <label for="name">Name</label>
                     <input type="text" id="name" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="photoUpload">Upload Receipt/Photo</label>
+                    <input type="file" id="photoUpload" accept="image/*">
+                    <div class="preview-container">
+                        <img id="photoPreview" alt="Preview">
+                    </div>
                 </div>
             </div>
             <button type="submit" class="btn btn-success" id="saveBtn">Add Expense</button>
@@ -363,10 +437,11 @@
                     <th>S.No</th>
                     <th>Product</th>
                     <th>Product Description</th>
-                    <th>Date</th>
+                    <th>Date & Time</th>
                     <th>Rate</th>
                     <th>Spend in Rupees</th>
                     <th>Name</th>
+                    <th>Photo</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -379,6 +454,7 @@
                     <td id="totalSpend"><strong>₹0</strong></td>
                     <td>-</td>
                     <td>-</td>
+                    <td>-</td>
                 </tr>
             </tfoot>
         </table>
@@ -388,13 +464,21 @@
         </div>
     </div>
 
+    <!-- Modal for photo preview -->
+    <div id="photoModal" class="modal">
+        <span class="close">&times;</span>
+        <div class="modal-content">
+            <img class="modal-img" id="modalImg">
+        </div>
+    </div>
+
     <script>
         // Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyDZKjmib6_4O8lcIt4YX-5pkewrvCsVZro",
             authDomain: "dream-home-5f966.firebaseapp.com",
             projectId: "dream-home-5f966",
-            storageBucket: "dream-home-5f966.firebasestorage.app",
+            storageBucket: "dream-home-5f966.appspot.com",
             messagingSenderId: "884300567643",
             appId: "1:884300567643:web:8996af2bd116d1e23e1b7e",
             measurementId: "G-56V6KWH96D"
@@ -403,10 +487,12 @@
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
+        const storage = firebase.storage();
         const expensesCollection = db.collection('expenses');
 
         // Global expenses array
         let expenses = [];
+        let photoFile = null;
 
         // Show notification
         function showNotification(message, type = 'success') {
@@ -421,35 +507,56 @@
             }, 3000);
         }
 
-        // Format date from YYYY-MM-DD to DD-MM-YYYY
-        function formatDate(dateString) {
-            if (!dateString) return "";
-            const dateParts = dateString.split('-');
-            if (dateParts.length !== 3) return dateString;
-            return `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
-        }
-
-        // Format date for input field (YYYY-MM-DD)
-        function formatDateForInput(dateStr) {
-            if (!dateStr) return "";
-            // Check if it's already in YYYY-MM-DD format
-            if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) return dateStr;
-
-            // Convert from DD-MM-YYYY to YYYY-MM-DD
-            const parts = dateStr.split('-');
-            if (parts.length !== 3) return dateStr;
-            return `${parts[2]}-${parts[1]}-${parts[0]}`;
-        }
-
-        // Parse date for sorting (YYYY-MM-DD to Date object)
-        function parseDate(dateStr) {
-            if (!dateStr) return new Date(0); // Default to epoch
-            const parts = dateStr.split('-');
-            if (parts.length === 3) {
-                // Format is YYYY-MM-DD
-                return new Date(parts[0], parts[1] - 1, parts[2]);
+        // Format datetime from YYYY-MM-DDTHH:MM to DD-MM-YYYY HH:MM
+        function formatDateTime(dateTimeString) {
+            if (!dateTimeString) return "-";
+            
+            try {
+                const date = new Date(dateTimeString);
+                return date.toLocaleString('en-GB', { 
+                    day: '2-digit', 
+                    month: '2-digit', 
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                });
+            } catch (e) {
+                console.error("Date parsing error:", e);
+                return dateTimeString; // Return original if parsing fails
             }
-            return new Date(0);
+        }
+
+        // Format datetime for input field (YYYY-MM-DDTHH:MM)
+        function formatDateTimeForInput(dateTimeStr) {
+            if (!dateTimeStr) return "";
+
+            try {
+                const date = new Date(dateTimeStr);
+                
+                // Check if valid date object
+                if (isNaN(date.getTime())) {
+                    throw new Error("Invalid date");
+                }
+                
+                // Format for datetime-local input
+                return date.toISOString().slice(0, 16);
+            } catch (e) {
+                console.error("Date formatting error:", e);
+                return ""; // Return empty if formatting fails
+            }
+        }
+
+        // Parse datetime for sorting
+        function parseDateTime(dateTimeStr) {
+            if (!dateTimeStr) return new Date(0); // Default to epoch
+            
+            try {
+                return new Date(dateTimeStr);
+            } catch (e) {
+                console.error("Date parsing error for sorting:", e);
+                return new Date(0);
+            }
         }
 
         // Format number as currency
@@ -463,7 +570,7 @@
             document.getElementById('expensesTable').style.display = 'none';
 
             try {
-                const snapshot = await expensesCollection.orderBy('date', 'desc').get();
+                const snapshot = await expensesCollection.orderBy('timestamp', 'desc').get();
                 expenses = [];
 
                 snapshot.forEach(doc => {
@@ -481,8 +588,8 @@
                     return loadExpenses();
                 }
 
-                // Sort expenses by date (newest first)
-                expenses.sort((a, b) => parseDate(b.date) - parseDate(a.date));
+                // Sort expenses by datetime (newest first)
+                expenses.sort((a, b) => parseDateTime(b.datetime) - parseDateTime(a.datetime));
 
                 renderTable();
                 updateLastUpdated();
@@ -498,33 +605,37 @@
 
         // Add initial sample data
         async function addInitialData() {
+            const now = new Date();
             const initialData = [
                 {
                     product: "MAP",
                     description: "Initial ground level map",
-                    date: "2024-10-05",
+                    datetime: new Date("2024-10-05T10:30").toISOString(),
                     rate: "₹5000",
                     spend: 5000,
                     name: "Neeraj",
-                    timestamp: firebase.firestore.Timestamp.now()
+                    timestamp: firebase.firestore.Timestamp.now(),
+                    photoURL: ""
                 },
                 {
                     product: "MAP-CIVIL",
                     description: "Exterial and beam design",
-                    date: "2025-03-03",
+                    datetime: new Date("2025-03-03T14:45").toISOString(),
                     rate: "₹6/sqft",
                     spend: 5000,
                     name: "Neeraj",
-                    timestamp: firebase.firestore.Timestamp.now()
+                    timestamp: firebase.firestore.Timestamp.now(),
+                    photoURL: ""
                 },
                 {
                     product: "Thakedar",
                     description: "",
-                    date: "2025-03-06",
+                    datetime: new Date("2025-03-06T09:15").toISOString(),
                     rate: "₹180/sqft",
                     spend: 100,
                     name: "Tuntun",
-                    timestamp: firebase.firestore.Timestamp.now()
+                    timestamp: firebase.firestore.Timestamp.now(),
+                    photoURL: ""
                 }
             ];
 
@@ -545,8 +656,8 @@
 
             const dataToRender = filteredExpenses || expenses;
             
-            // Sort expenses by date (newest first)
-            const sortedExpenses = [...dataToRender].sort((a, b) => parseDate(b.date) - parseDate(a.date));
+            // Sort expenses by datetime (newest first)
+            const sortedExpenses = [...dataToRender].sort((a, b) => parseDateTime(b.datetime) - parseDateTime(a.datetime));
 
             // Starting S.No
             let serialNumber = 1;
@@ -554,15 +665,22 @@
             sortedExpenses.forEach((expense) => {
                 const row = document.createElement('tr');
 
+                // Prepare photo cell content
+                let photoCell = '-';
+                if (expense.photoURL) {
+                    photoCell = `<img src="${expense.photoURL}" alt="Receipt" class="thumbnail" onclick="openPhotoModal('${expense.photoURL}')">`;
+                }
+
                 // Add data-label attributes for mobile view
                 const cells = `
                     <td data-label="S.No">${serialNumber}</td>
                     <td data-label="Product">${expense.product}</td>
                     <td data-label="Description">${expense.description || '-'}</td>
-                    <td data-label="Date">${formatDate(expense.date)}</td>
+                    <td data-label="Date & Time">${formatDateTime(expense.datetime)}</td>
                     <td data-label="Rate">${expense.rate}</td>
                     <td data-label="Spend">${formatCurrency(expense.spend)}</td>
                     <td data-label="Name">${expense.name}</td>
+                    <td data-label="Photo">${photoCell}</td>
                     <td class="action-cell" data-label="Actions">
                         <button class="btn" onclick="editExpense('${expense.id}')">Edit</button>
                         <button class="btn btn-danger" onclick="deleteExpense('${expense.id}')">Delete</button>
@@ -590,24 +708,67 @@
             document.getElementById('lastUpdated').textContent = `Last Updated: ${formattedDate}`;
         }
 
+        // Upload photo to Firebase Storage
+        async function uploadPhoto(file, expenseId) {
+            if (!file) return null;
+
+            const storageRef = storage.ref();
+            const fileRef = storageRef.child(`receipts/${expenseId}_${file.name}`);
+            
+            try {
+                await fileRef.put(file);
+                const downloadURL = await fileRef.getDownloadURL();
+                return downloadURL;
+            } catch (error) {
+                console.error("Error uploading photo:", error);
+                throw error;
+            }
+        }
+
         // Add or update expense
         async function saveExpense(e) {
             e.preventDefault();
 
             const editId = document.getElementById('editId').value;
-
-            const expense = {
-                product: document.getElementById('product').value,
-                description: document.getElementById('description').value,
-                date: document.getElementById('date').value,
-                rate: document.getElementById('rate').value,
-                spend: parseFloat(document.getElementById('spend').value),
-                name: document.getElementById('name').value,
-                timestamp: firebase.firestore.Timestamp.now()
-            };
+            const saveBtn = document.getElementById('saveBtn');
+            
+            // Disable button to prevent multiple submissions
+            saveBtn.disabled = true;
+            saveBtn.textContent = editId ? 'Updating...' : 'Adding...';
 
             try {
+                let photoURL = null;
+                
+                // If editing and there's a photo file, upload it
+                if (photoFile) {
+                    const uploadId = editId || Date.now().toString();
+                    photoURL = await uploadPhoto(photoFile, uploadId);
+                }
+
+                const expense = {
+                    product: document.getElementById('product').value,
+                    description: document.getElementById('description').value,
+                    datetime: document.getElementById('datetime').value,
+                    rate: document.getElementById('rate').value,
+                    spend: parseFloat(document.getElementById('spend').value),
+                    name: document.getElementById('name').value,
+                    timestamp: firebase.firestore.Timestamp.now()
+                };
+
+                // Add photo URL if available
+                if (photoURL) {
+                    expense.photoURL = photoURL;
+                }
+
                 if (editId) {
+                    // If editing and not uploading a new photo, preserve existing photo
+                    if (!photoFile) {
+                        const existingExpense = expenses.find(e => e.id === editId);
+                        if (existingExpense && existingExpense.photoURL) {
+                            expense.photoURL = existingExpense.photoURL;
+                        }
+                    }
+                    
                     // Update existing expense
                     await expensesCollection.doc(editId).update(expense);
                     showNotification("Expense updated successfully!");
@@ -622,12 +783,21 @@
                 document.getElementById('editId').value = '';
                 document.getElementById('saveBtn').textContent = 'Add Expense';
                 document.getElementById('cancelBtn').style.display = 'none';
+                document.getElementById('photoPreview').style.display = 'none';
+                photoFile = null;
+
+                // Reset datetime to current
+                setCurrentDateTime();
 
                 // Reload data
                 loadExpenses();
             } catch (error) {
                 console.error("Error saving expense:", error);
                 showNotification("Error saving expense: " + error.message, 'error');
+            } finally {
+                // Re-enable button
+                saveBtn.disabled = false;
+                saveBtn.textContent = editId ? 'Update Expense' : 'Add Expense';
             }
         }
 
@@ -638,14 +808,24 @@
 
             document.getElementById('product').value = expense.product;
             document.getElementById('description').value = expense.description || '';
-            document.getElementById('date').value = formatDateForInput(expense.date);
+            document.getElementById('datetime').value = formatDateTimeForInput(expense.datetime);
             document.getElementById('rate').value = expense.rate;
             document.getElementById('spend').value = expense.spend;
             document.getElementById('name').value = expense.name;
             document.getElementById('editId').value = id;
 
+            // Preview existing photo if available
+            const photoPreview = document.getElementById('photoPreview');
+            if (expense.photoURL) {
+                photoPreview.src = expense.photoURL;
+                photoPreview.style.display = 'block';
+            } else {
+                photoPreview.style.display = 'none';
+            }
+
             document.getElementById('saveBtn').textContent = 'Update Expense';
             document.getElementById('cancelBtn').style.display = 'inline-block';
+            photoFile = null;
 
             // Scroll to form
             document.getElementById('expenseForm').scrollIntoView({ behavior: 'smooth' });
@@ -655,6 +835,20 @@
         async function deleteExpense(id) {
             if (confirm('Are you sure you want to delete this expense?')) {
                 try {
+                    const expense = expenses.find(e => e.id === id);
+                    
+                    // Delete photo from storage if exists
+                    if (expense && expense.photoURL) {
+                        try {
+                            const photoRef = storage.refFromURL(expense.photoURL);
+                            await photoRef.delete();
+                        } catch (photoError) {
+                            console.error("Error deleting photo:", photoError);
+                            // Continue with expense deletion even if photo deletion fails
+                        }
+                    }
+                    
+                    // Delete expense document
                     await expensesCollection.doc(id).delete();
                     showNotification("Expense deleted successfully!");
                     loadExpenses();
@@ -671,6 +865,50 @@
             document.getElementById('editId').value = '';
             document.getElementById('saveBtn').textContent = 'Add Expense';
             document.getElementById('cancelBtn').style.display = 'none';
+            document.getElementById('photoPreview').style.display = 'none';
+            photoFile = null;
+            
+            // Reset datetime to current
+            setCurrentDateTime();
+        }
+
+        // Set current date and time
+        function setCurrentDateTime() {
+            const now = new Date();
+            const localDatetime = now.toISOString().slice(0, 16);
+            document.getElementById('datetime').value = localDatetime;
+        }
+
+        // Handle photo upload preview
+        function handlePhotoUpload(e) {
+            const file = e.target.files[0];
+            if (!file) {
+                document.getElementById('photoPreview').style.display = 'none';
+                photoFile = null;
+                return;
+            }
+
+            photoFile = file;
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const preview = document.getElementById('photoPreview');
+                preview.src = event.target.result;
+                preview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Open photo modal
+        function openPhotoModal(photoURL) {
+            const modal = document.getElementById('photoModal');
+            const modalImg = document.getElementById('modalImg');
+            modalImg.src = photoURL;
+            modal.style.display = 'block';
+        }
+
+        // Close photo modal
+        function closePhotoModal() {
+            document.getElementById('photoModal').style.display = 'none';
         }
 
         // Search functionality
@@ -686,7 +924,8 @@
                 expense.product.toLowerCase().includes(query) ||
                 (expense.description && expense.description.toLowerCase().includes(query)) ||
                 expense.name.toLowerCase().includes(query) ||
-                expense.rate.toLowerCase().includes(query)
+                expense.rate.toLowerCase().includes(query) ||
+                formatDateTime(expense.datetime).toLowerCase().includes(query)
             );
 
             renderTable(filteredExpenses);
@@ -694,11 +933,11 @@
 
         // Function to download table as CSV
         function downloadCSV() {
-            // Sort expenses by date (newest first)
-            const sortedExpenses = [...expenses].sort((a, b) => parseDate(b.date) - parseDate(a.date));
+            // Sort expenses by datetime (newest first)
+            const sortedExpenses = [...expenses].sort((a, b) => parseDateTime(b.datetime) - parseDateTime(a.datetime));
             
             let csv = [
-                ['S.No', 'Product', 'Product Description', 'Date', 'Rate', 'Spend in Rupees', 'Name']
+                ['S.No', 'Product', 'Product Description', 'Date & Time', 'Rate', 'Spend in Rupees', 'Name', 'Photo URL']
             ];
 
             // Add data rows
@@ -707,16 +946,17 @@
                     index + 1,
                     expense.product,
                     expense.description || '',
-                    formatDate(expense.date),
+                    formatDateTime(expense.datetime),
                     expense.rate,
                     expense.spend,
-                    expense.name
+                    expense.name,
+                    expense.photoURL || ''
                 ]);
             });
 
             // Add total row
             const total = expenses.reduce((sum, expense) => sum + expense.spend, 0);
-            csv.push(['', '', '', '', 'Total:', total, '']);
+            csv.push(['', '', '', '', '', total, '', '']);
 
             // Convert to CSV string
             const csvContent = csv.map(row =>
@@ -737,88 +977,5 @@
 
         // Function to download table as Excel
         function downloadExcel() {
-            // Sort expenses by date (newest first)
-            const sortedExpenses = [...expenses].sort((a, b) => parseDate(b.date) - parseDate(a.date));
-            
-            let html = '<table border="1">';
-
-            // Header row
-            html += '<tr>';
-            ['S.No', 'Product', 'Product Description', 'Date', 'Rate', 'Spend in Rupees', 'Name'].forEach(header => {
-                html += `<th>${header}</th>`;
-            });
-            html += '</tr>';
-
-            // Data rows
-            sortedExpenses.forEach((expense, index) => {
-                html += '<tr>';
-                html += `<td>${index + 1}</td>`;
-                html += `<td>${expense.product}</td>`;
-                html += `<td>${expense.description || ''}</td>`;
-                html += `<td>${formatDate(expense.date)}</td>`;
-                html += `<td>${expense.rate}</td>`;
-                html += `<td>${expense.spend}</td>`;
-                html += `<td>${expense.name}</td>`;
-                html += '</tr>';
-            });
-
-            // Total row
-            const total = expenses.reduce((sum, expense) => sum + expense.spend, 0);
-            html += '<tr>';
-            html += '<td colspan="5" style="text-align:right;"><strong>Total:</strong></td>';
-            html += `<td><strong>${total}</strong></td>`;
-            html += '<td></td>';
-            html += '</tr>';
-
-            html += '</table>';
-
-            // Create a blob
-            const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
-            const url = window.URL.createObjectURL(blob);
-
-            // Create download link
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = 'project_expenses.xls';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
-        }
-
-        // Function to print table
-        function printTable() {
-            window.print();
-        }
-
-        // Make functions available globally (for HTML onclick)
-        window.editExpense = editExpense;
-        window.deleteExpense = deleteExpense;
-
-        // Add event listeners
-        document.addEventListener('DOMContentLoaded', function () {
-            // Load data
-            loadExpenses();
-
-            // Form submission
-            document.getElementById('expenseForm').addEventListener('submit', saveExpense);
-
-            // Cancel button
-            document.getElementById('cancelBtn').addEventListener('click', cancelEdit);
-
-            // Download buttons
-            document.getElementById('downloadCSV').addEventListener('click', downloadCSV);
-            document.getElementById('downloadExcel').addEventListener('click', downloadExcel);
-            document.getElementById('printTable').addEventListener('click', printTable);
-
-            // Search input
-            document.getElementById('searchInput').addEventListener('input', searchExpenses);
-
-            // Set today's date as default in the date field
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('date').value = today;
-        });
-    </script>
-</body>
-
-</html>
+            // Sort expenses by datetime (newest first)
+            const sortedExpenses = [...expenses].sort
