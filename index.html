@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project Expenses Tracker</title>
+    <title>Dream-Home Project Expenses Tracker</title>
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -322,8 +322,8 @@
                     <input type="text" id="description">
                 </div>
                 <div class="form-group">
-                    <label for="date">Date</label>
-                    <input type="date" id="date" required>
+                    <label for="date">Date & Time</label>
+                    <input type="datetime-local" id="date" required>
                 </div>
             </div>
             <div class="form-row">
@@ -363,7 +363,7 @@
                     <th>S.No</th>
                     <th>Product</th>
                     <th>Product Description</th>
-                    <th>Date</th>
+                    <th>Date & Time</th>
                     <th>Rate</th>
                     <th>Spend in Rupees</th>
                     <th>Name</th>
@@ -421,35 +421,44 @@
             }, 3000);
         }
 
-        // Format date from YYYY-MM-DD to DD-MM-YYYY
+        // Format date from ISO to readable format
         function formatDate(dateString) {
             if (!dateString) return "";
-            const dateParts = dateString.split('-');
-            if (dateParts.length !== 3) return dateString;
-            return `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
+            const date = new Date(dateString);
+            return date.toLocaleString();
         }
 
-        // Format date for input field (YYYY-MM-DD)
+        // Format date for datetime-local input
         function formatDateForInput(dateStr) {
             if (!dateStr) return "";
-            // Check if it's already in YYYY-MM-DD format
-            if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) return dateStr;
-
-            // Convert from DD-MM-YYYY to YYYY-MM-DD
-            const parts = dateStr.split('-');
-            if (parts.length !== 3) return dateStr;
-            return `${parts[2]}-${parts[1]}-${parts[0]}`;
+            
+            // If already in ISO format with seconds
+            if (dateStr.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(.\d+)?$/)) {
+                return dateStr.substring(0, 16); // Trim to YYYY-MM-DDTHH:MM
+            }
+            
+            // If already in ISO format without seconds
+            if (dateStr.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+                return dateStr;
+            }
+            
+            // Try to parse as date
+            try {
+                const date = new Date(dateStr);
+                return date.toISOString().substring(0, 16); // Format as YYYY-MM-DDTHH:MM
+            } catch (e) {
+                return dateStr;
+            }
         }
 
-        // Parse date for sorting (YYYY-MM-DD to Date object)
+        // Parse date for sorting
         function parseDate(dateStr) {
             if (!dateStr) return new Date(0); // Default to epoch
-            const parts = dateStr.split('-');
-            if (parts.length === 3) {
-                // Format is YYYY-MM-DD
-                return new Date(parts[0], parts[1] - 1, parts[2]);
+            try {
+                return new Date(dateStr);
+            } catch (e) {
+                return new Date(0);
             }
-            return new Date(0);
         }
 
         // Format number as currency
@@ -463,7 +472,7 @@
             document.getElementById('expensesTable').style.display = 'none';
 
             try {
-                const snapshot = await expensesCollection.orderBy('date', 'desc').get();
+                const snapshot = await expensesCollection.orderBy('timestamp', 'desc').get();
                 expenses = [];
 
                 snapshot.forEach(doc => {
@@ -474,12 +483,6 @@
                         spend: parseFloat(data.spend)
                     });
                 });
-
-                // If no expenses, add initial data
-                if (expenses.length === 0) {
-                    await addInitialData();
-                    return loadExpenses();
-                }
 
                 // Sort expenses by date (newest first)
                 expenses.sort((a, b) => parseDate(b.date) - parseDate(a.date));
@@ -493,48 +496,6 @@
                 console.error("Error loading expenses:", error);
                 showNotification("Error loading expenses: " + error.message, 'error');
                 document.getElementById('loading').style.display = 'none';
-            }
-        }
-
-        // Add initial sample data
-        async function addInitialData() {
-            const initialData = [
-                {
-                    product: "MAP",
-                    description: "Initial ground level map",
-                    date: "2024-10-05",
-                    rate: "₹5000",
-                    spend: 5000,
-                    name: "Neeraj",
-                    timestamp: firebase.firestore.Timestamp.now()
-                },
-                {
-                    product: "MAP-CIVIL",
-                    description: "Exterial and beam design",
-                    date: "2025-03-03",
-                    rate: "₹6/sqft",
-                    spend: 5000,
-                    name: "Neeraj",
-                    timestamp: firebase.firestore.Timestamp.now()
-                },
-                {
-                    product: "Thakedar",
-                    description: "",
-                    date: "2025-03-06",
-                    rate: "₹180/sqft",
-                    spend: 100,
-                    name: "Tuntun",
-                    timestamp: firebase.firestore.Timestamp.now()
-                }
-            ];
-
-            try {
-                for (const expense of initialData) {
-                    await expensesCollection.add(expense);
-                }
-            } catch (error) {
-                console.error("Error adding initial data:", error);
-                showNotification("Error adding initial data: " + error.message, 'error');
             }
         }
 
@@ -559,7 +520,7 @@
                     <td data-label="S.No">${serialNumber}</td>
                     <td data-label="Product">${expense.product}</td>
                     <td data-label="Description">${expense.description || '-'}</td>
-                    <td data-label="Date">${formatDate(expense.date)}</td>
+                    <td data-label="Date & Time">${formatDate(expense.date)}</td>
                     <td data-label="Rate">${expense.rate}</td>
                     <td data-label="Spend">${formatCurrency(expense.spend)}</td>
                     <td data-label="Name">${expense.name}</td>
@@ -671,6 +632,9 @@
             document.getElementById('editId').value = '';
             document.getElementById('saveBtn').textContent = 'Add Expense';
             document.getElementById('cancelBtn').style.display = 'none';
+            
+            // Set current date and time in the date field
+            setCurrentDateTime();
         }
 
         // Search functionality
@@ -698,7 +662,7 @@
             const sortedExpenses = [...expenses].sort((a, b) => parseDate(b.date) - parseDate(a.date));
             
             let csv = [
-                ['S.No', 'Product', 'Product Description', 'Date', 'Rate', 'Spend in Rupees', 'Name']
+                ['S.No', 'Product', 'Product Description', 'Date & Time', 'Rate', 'Spend in Rupees', 'Name']
             ];
 
             // Add data rows
@@ -744,7 +708,7 @@
 
             // Header row
             html += '<tr>';
-            ['S.No', 'Product', 'Product Description', 'Date', 'Rate', 'Spend in Rupees', 'Name'].forEach(header => {
+            ['S.No', 'Product', 'Product Description', 'Date & Time', 'Rate', 'Spend in Rupees', 'Name'].forEach(header => {
                 html += `<th>${header}</th>`;
             });
             html += '</tr>';
@@ -791,6 +755,18 @@
             window.print();
         }
 
+        // Set current date and time in the date field
+        function setCurrentDateTime() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const currentDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+            document.getElementById('date').value = currentDateTime;
+        }
+
         // Make functions available globally (for HTML onclick)
         window.editExpense = editExpense;
         window.deleteExpense = deleteExpense;
@@ -814,9 +790,8 @@
             // Search input
             document.getElementById('searchInput').addEventListener('input', searchExpenses);
 
-            // Set today's date as default in the date field
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('date').value = today;
+            // Set current date and time in the date field
+            setCurrentDateTime();
         });
     </script>
 </body>
