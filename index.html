@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dream-Home Project Expenses Tracker</title>
+    <title>Dream-Home</title>
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -12,97 +12,130 @@
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
+            padding: 0;
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            background-attachment: fixed;
+            color: #333;
+            min-height: 100vh;
         }
 
         .container {
             max-width: 1000px;
-            margin: 0 auto;
-            background-color: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin: 30px auto;
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+            backdrop-filter: blur(10px);
         }
 
         h1 {
             text-align: center;
             color: #2c3e50;
-            margin-bottom: 20px;
-            font-size: 24px;
+            margin-bottom: 25px;
+            font-size: 28px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            position: relative;
+            padding-bottom: 15px;
+        }
+
+        h1:after {
+            content: '';
+            position: absolute;
+            width: 80px;
+            height: 3px;
+            background: linear-gradient(90deg, #6a11cb, #2575fc);
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            border-radius: 2px;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
         }
 
         th {
-            background-color: #3498db;
+            background: linear-gradient(90deg, #4e54c8, #8f94fb);
             color: white;
             text-align: center;
-            padding: 12px 8px;
-            border: 1px solid #ddd;
+            padding: 15px 8px;
             font-weight: bold;
+            text-transform: uppercase;
+            font-size: 14px;
+            letter-spacing: 0.5px;
         }
 
         td {
-            padding: 10px 8px;
-            border: 1px solid #ddd;
+            padding: 12px 8px;
+            border-bottom: 1px solid #ddd;
             text-align: center;
         }
 
         tr:nth-child(even) {
-            background-color: #f9f9f9;
+            background-color: rgba(249, 249, 249, 0.7);
         }
 
         tr:hover {
-            background-color: #f1f1f1;
+            background-color: rgba(236, 240, 255, 0.8);
+            transition: background-color 0.3s ease;
         }
 
         .total-row {
-            background-color: #e8f4fc;
+            background: linear-gradient(90deg, #e6f7ff, #cce7ff);
             font-weight: bold;
         }
 
         .btn {
-            background-color: #3498db;
+            background: linear-gradient(90deg, #4e54c8, #8f94fb);
             color: white;
-            padding: 8px 12px;
+            padding: 10px 15px;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
             font-size: 14px;
-            margin-right: 5px;
-            margin-bottom: 5px;
+            margin-right: 8px;
+            margin-bottom: 8px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
         }
 
         .btn:hover {
-            background-color: #2980b9;
+            background: linear-gradient(90deg, #3a40c8, #7a7ff8);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
         }
 
         .btn-danger {
-            background-color: #e74c3c;
+            background: linear-gradient(90deg, #ff416c, #ff4b2b);
         }
 
         .btn-danger:hover {
-            background-color: #c0392b;
+            background: linear-gradient(90deg, #e63e66, #e34326);
         }
 
         .btn-success {
-            background-color: #2ecc71;
+            background: linear-gradient(90deg, #11998e, #38ef7d);
         }
 
         .btn-success:hover {
-            background-color: #27ae60;
+            background: linear-gradient(90deg, #0e8a80, #32d871);
         }
 
         .footer {
-            margin-top: 20px;
+            margin-top: 30px;
             text-align: center;
-            color: #7f8c8d;
+            color: #fff;
             font-size: 14px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
         }
 
         .actions {
@@ -110,43 +143,54 @@
             display: flex;
             flex-wrap: wrap;
             justify-content: space-between;
+            align-items: center;
         }
 
         form {
-            margin-bottom: 20px;
-            background-color: #f9f9f9;
-            padding: 15px;
-            border-radius: 5px;
-            border: 1px solid #ddd;
+            margin-bottom: 25px;
+            background: linear-gradient(to right, #f8f9fa, #e9ecef);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
         }
 
         .form-row {
             display: flex;
             flex-wrap: wrap;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
+            gap: 15px;
         }
 
         .form-group {
             flex: 1;
             min-width: 150px;
-            margin-right: 10px;
-            margin-bottom: 10px;
         }
 
         .form-group label {
             display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
+            margin-bottom: 8px;
+            font-weight: 600;
             color: #333;
+            font-size: 14px;
         }
 
         .form-group input,
         .form-group textarea {
             width: 100%;
-            padding: 8px;
+            padding: 12px;
             border: 1px solid #ddd;
-            border-radius: 4px;
+            border-radius: 6px;
             box-sizing: border-box;
+            transition: border 0.3s ease;
+            background-color: rgba(255, 255, 255, 0.8);
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            border-color: #4e54c8;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(78, 84, 200, 0.1);
         }
 
         .action-cell {
@@ -161,33 +205,46 @@
         }
 
         #searchInput {
-            padding: 8px;
+            padding: 12px;
             border: 1px solid #ddd;
-            border-radius: 4px;
+            border-radius: 8px;
             width: 250px;
             max-width: 100%;
             margin-bottom: 10px;
+            background-color: white;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+        }
+
+        #searchInput:focus {
+            border-color: #4e54c8;
+            box-shadow: 0 0 0 3px rgba(78, 84, 200, 0.1);
+            outline: none;
         }
 
         #loading {
             text-align: center;
-            padding: 20px;
+            padding: 30px;
+            color: white;
+            font-size: 18px;
         }
 
         .notification {
-            padding: 10px 15px;
-            margin-bottom: 15px;
-            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
             color: white;
             display: none;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
         }
 
         .notification.success {
-            background-color: #2ecc71;
+            background: linear-gradient(90deg, #11998e, #38ef7d);
         }
 
         .notification.error {
-            background-color: #e74c3c;
+            background: linear-gradient(90deg, #ff416c, #ff4b2b);
         }
 
         /* Mobile Responsive Styles */
@@ -198,10 +255,11 @@
 
             .container {
                 padding: 15px;
+                margin: 15px;
             }
 
             h1 {
-                font-size: 20px;
+                font-size: 22px;
             }
 
             .actions {
@@ -221,8 +279,7 @@
 
             .btn {
                 font-size: 13px;
-                padding: 7px 10px;
-                margin-bottom: 5px;
+                padding: 8px 12px;
             }
 
             /* Card-based layout for mobile */
@@ -239,9 +296,11 @@
 
             tr {
                 border: 1px solid #ccc;
-                margin-bottom: 10px;
-                border-radius: 5px;
+                margin-bottom: 15px;
+                border-radius: 8px;
                 overflow: hidden;
+                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+                background-color: white;
             }
 
             td {
@@ -254,18 +313,24 @@
 
             td:before {
                 position: absolute;
-                top: 10px;
-                left: 10px;
+                top: 12px;
+                left: 12px;
                 width: 45%;
                 white-space: nowrap;
                 text-align: left;
                 font-weight: bold;
                 content: attr(data-label);
+                color: #555;
+            }
+
+            td:last-child {
+                border-bottom: none;
             }
 
             .total-row td {
                 text-align: right;
                 padding-left: 10px;
+                background: linear-gradient(90deg, #e6f7ff, #cce7ff);
             }
 
             /* Exception for total row */
@@ -286,10 +351,11 @@
                 tr {
                     border: revert;
                     margin-bottom: revert;
+                    box-shadow: none;
                 }
 
                 td {
-                    border: 1px solid #ddd;
+                    border-bottom: 1px solid #ddd;
                     position: revert;
                     padding-left: revert;
                     text-align: center;
@@ -305,7 +371,7 @@
 
 <body>
     <div class="container">
-        <h1>Project Expenses Tracker</h1>
+        <h1>Dream-Home Project Expenses Tracker</h1>
 
         <div id="notification" class="notification"></div>
 
